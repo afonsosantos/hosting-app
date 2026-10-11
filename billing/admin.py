@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin.options import IS_POPUP_VAR
 from django.core.exceptions import PermissionDenied
@@ -11,7 +12,7 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 
 from .models import Invoice, InvoiceLine, Notification, Subscription, SubscriptionItem
-from .notifications import send_notification, send_subscription_plan
+from .notifications import send_contract, send_notification, send_subscription_plan
 from .schedule import PlanSummary, euros, payment_schedule
 from .services import (
     create_invoice_for_subscription,
@@ -95,6 +96,15 @@ class InvoiceInlineForSubscription(admin.TabularInline):
         return obj.number
 
 
+class SubscriptionAddForm(forms.ModelForm):
+    send_contract = forms.BooleanField(
+        label="Gerar e enviar contrato por email",
+        required=False,
+        help_text="Envia ao cliente o contrato e o plano de pagamentos em PDF "
+        "(em vez do email só com o plano de pagamentos).",
+    )
+
+
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):
     change_form_template = "admin/billing/subscription/change_form.html"
@@ -151,14 +161,35 @@ class SubscriptionAdmin(admin.ModelAdmin):
         extra_context = {**(extra_context or {}), "summary": PlanSummary([])}
         return super().add_view(request, form_url, extra_context)
 
+    def get_form(self, request, obj=None, **kwargs):
+        if obj is None:
+            kwargs["form"] = SubscriptionAddForm
+        return super().get_form(request, obj, **kwargs)
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if obj is None:
+            fieldsets = [*fieldsets, ("Contrato", {"fields": ["send_contract"]})]
+        return fieldsets
+
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
-        if not change:
-            sub = form.instance
-            if subscription_created(sub):
-                self.message_user(
-                    request, f"Plano de pagamentos enviado para {sub.customer.notification_email}."
-                )
+        if change:
+            return
+        sub = form.instance
+        if form.cleaned_data.get("send_contract"):
+            # o email do contrato já leva o plano de pagamentos: não envia os dois
+            self._report_sent(request, send_contract(sub), "Contrato")
+        elif subscription_created(sub):
+            self.message_user(
+                request, f"Plano de pagamentos enviado para {sub.customer.notification_email}."
+            )
+
+    def _report_sent(self, request, log, what):
+        if log.success:
+            self.message_user(request, f"{what} enviado para {log.recipient}.")
+        else:
+            self.message_user(request, f"{what}: falhou o envio — {log.error}", messages.ERROR)
 
     def response_add(self, request, obj, post_url_continue=None):
         # Depois de criar, fica na subscrição para ver o plano de pagamentos.
@@ -183,22 +214,72 @@ class SubscriptionAdmin(admin.ModelAdmin):
                 )
 
     def get_urls(self):
+        view = self.admin_site.admin_view
         return [
             path(
                 "<int:pk>/send-plan/",
-                self.admin_site.admin_view(self.send_plan_view),
+                view(self.send_plan_view),
                 name="billing_subscription_send_plan",
+            ),
+            path(
+                "<int:pk>/plan/pdf/", view(self.plan_pdf_view), name="billing_subscription_plan_pdf"
+            ),
+            path(
+                "<int:pk>/contract/",
+                view(self.contract_view),
+                name="billing_subscription_contract",
+            ),
+            path(
+                "<int:pk>/contract/pdf/",
+                view(self.contract_pdf_view),
+                name="billing_subscription_contract_pdf",
+            ),
+            path(
+                "<int:pk>/send-contract/",
+                view(self.send_contract_view),
+                name="billing_subscription_send_contract",
             ),
         ] + super().get_urls()
 
-    def send_plan_view(self, request, pk):
+    def _get(self, request, pk):
         sub = get_object_or_404(Subscription.objects.select_related("customer"), pk=pk)
+        if not self.has_view_permission(request, sub):
+            raise PermissionDenied
+        return sub
+
+    @staticmethod
+    def _pdf_response(content, filename):
+        response = HttpResponse(content, content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="{filename}"'
+        return response
+
+    def plan_pdf_view(self, request, pk):
+        from .pdf import plan_filename, render_plan_pdf
+
+        sub = self._get(request, pk)
+        return self._pdf_response(render_plan_pdf(sub), plan_filename(sub))
+
+    def contract_view(self, request, pk):
+        from .pdf import render_contract_html
+
+        return HttpResponse(render_contract_html(self._get(request, pk), for_print=True))
+
+    def contract_pdf_view(self, request, pk):
+        from .pdf import contract_filename, render_contract_pdf
+
+        sub = self._get(request, pk)
+        return self._pdf_response(render_contract_pdf(sub), contract_filename(sub))
+
+    def send_plan_view(self, request, pk):
+        sub = self._get(request, pk)
         if request.method == "POST" and self.has_change_permission(request, sub):
-            log = send_subscription_plan(sub)
-            if log.success:
-                self.message_user(request, f"Plano de pagamentos enviado para {log.recipient}.")
-            else:
-                self.message_user(request, f"Falhou o envio: {log.error}", messages.ERROR)
+            self._report_sent(request, send_subscription_plan(sub), "Plano de pagamentos")
+        return redirect("admin:billing_subscription_change", pk)
+
+    def send_contract_view(self, request, pk):
+        sub = self._get(request, pk)
+        if request.method == "POST" and self.has_change_permission(request, sub):
+            self._report_sent(request, send_contract(sub), "Contrato")
         return redirect("admin:billing_subscription_change", pk)
 
 

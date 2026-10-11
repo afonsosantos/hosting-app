@@ -2,10 +2,19 @@
 
 {% block object-tools-items %}
   {% if original.pk %}
+    <li><a href="{% url 'admin:billing_subscription_plan_pdf' original.pk %}" target="_blank">Plano (PDF)</a></li>
+    <li><a href="{% url 'admin:billing_subscription_contract' original.pk %}" target="_blank">Contrato</a></li>
+    <li><a href="{% url 'admin:billing_subscription_contract_pdf' original.pk %}" target="_blank">Contrato (PDF)</a></li>
     <li>
-      <form method="post" action="{% url 'admin:billing_subscription_send_plan' original.pk %}">
+      <form method="post" action="{% url 'admin:billing_subscription_send_plan' original.pk %}" style="display:inline">
         {% csrf_token %}
         <button type="submit">Enviar plano por email</button>
+      </form>
+    </li>
+    <li>
+      <form method="post" action="{% url 'admin:billing_subscription_send_contract' original.pk %}" style="display:inline">
+        {% csrf_token %}
+        <button type="submit">Enviar contrato por email</button>
       </form>
     </li>
   {% endif %}

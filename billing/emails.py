@@ -14,6 +14,14 @@ from .schedule import euros, payment_schedule, schedule_as_text
 
 Kind = Notification.Kind
 
+ATTACHMENT_NOTES = {
+    Kind.ISSUE: "Documento em PDF em anexo.",
+    Kind.REMINDER: "Documento em PDF em anexo.",
+    Kind.OVERDUE: "Documento em PDF em anexo.",
+    Kind.SUBSCRIPTION: "Plano de pagamentos em PDF em anexo.",
+    Kind.CONTRACT: "Contrato e plano de pagamentos em PDF em anexo.",
+}
+
 
 @dataclass
 class RenderedEmail:
@@ -128,7 +136,7 @@ def render_email(
             "plan": plan,
             "show_payment": kind != Kind.PAID
             and bool(cfg.bank_details or cfg.payment_instructions),
-            "has_attachment": kind in (Kind.ISSUE, Kind.REMINDER, Kind.OVERDUE),
+            "attachment_note": ATTACHMENT_NOTES.get(kind, ""),
         }
         html = render_to_string("billing/emails/notification.html", ctx)
         text = _text_version(ctx)

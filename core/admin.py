@@ -34,6 +34,10 @@ class SiteSettingsAdmin(admin.ModelAdmin):
             },
         ),
         (
+            "Contrato",
+            {"classes": ["collapse"], "fields": ["contract_title", "contract_terms"]},
+        ),
+        (
             "Pagamento por transferência bancária",
             {
                 "fields": [
@@ -84,6 +88,8 @@ class SiteSettingsAdmin(admin.ModelAdmin):
                 "fields": [
                     "subscription_subject",
                     "subscription_body",
+                    "contract_subject",
+                    "contract_body",
                     "issue_subject",
                     "issue_body",
                     "reminder_subject",

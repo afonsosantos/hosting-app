@@ -57,13 +57,40 @@ def send_notification(invoice: Invoice, kind: str, days: int | None = None) -> N
     return log
 
 
-def send_subscription_plan(subscription: Subscription) -> Notification:
-    """Email ao cliente com os produtos da subscrição e o plano de pagamentos."""
+def _send_subscription_email(subscription: Subscription, kind: str) -> Notification:
+    from . import pdf
+
     customer = subscription.customer
-    log = Notification(
-        subscription=subscription, kind=Kind.SUBSCRIPTION, recipient=customer.notification_email
-    )
-    return _send(log, Kind.SUBSCRIPTION, {"customer": customer, "subscription": subscription})
+    log = Notification(subscription=subscription, kind=kind, recipient=customer.notification_email)
+    try:
+        attachments = []
+        if kind == Kind.CONTRACT:
+            attachments.append(
+                (
+                    pdf.contract_filename(subscription),
+                    pdf.render_contract_pdf(subscription),
+                    "application/pdf",
+                )
+            )
+        attachments.append(
+            (pdf.plan_filename(subscription), pdf.render_plan_pdf(subscription), "application/pdf")
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Falha a gerar o PDF da subscrição %s", subscription.pk)
+        log.error = f"Falha a gerar o PDF: {exc}"
+        log.save()
+        return log
+    return _send(log, kind, {"customer": customer, "subscription": subscription}, attachments)
+
+
+def send_subscription_plan(subscription: Subscription) -> Notification:
+    """Email ao cliente com os produtos da subscrição e o plano de pagamentos (em PDF)."""
+    return _send_subscription_email(subscription, Kind.SUBSCRIPTION)
+
+
+def send_contract(subscription: Subscription) -> Notification:
+    """Email ao cliente com o contrato e o plano de pagamentos (em PDF)."""
+    return _send_subscription_email(subscription, Kind.CONTRACT)
 
 
 def _already_sent(invoice: Invoice, kind: str, days: int) -> bool:

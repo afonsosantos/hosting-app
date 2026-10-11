@@ -1,0 +1,97 @@
+{% extends "billing/document_base.html" %}
+{% load billing_format %}
+
+{% block title %}{{ company.contract_title }} — {{ subscription }}{% endblock %}
+
+{% block extra_style %}
+  h2.section { font-size: 10pt; text-transform: uppercase; letter-spacing: .05em; margin: 24px 0 6px; padding-bottom: 3px; border-bottom: 1px solid #ddd; }
+  .section-body p { margin: 0 0 6px; }
+  .terms { line-height: 1.45; }
+  .terms p { margin: 0 0 8px; page-break-inside: avoid; }
+  .signatures { display: flex; gap: 48px; margin-top: 48px; page-break-inside: avoid; }
+  .signatures > div { flex: 1; }
+  .signatures .line { border-top: 1px solid #222; margin-top: 56px; padding-top: 4px; font-size: 9pt; }
+  .annex { page-break-before: always; }
+  .annex h1 { font-size: 14pt; font-weight: 600; margin: 0 0 14px; }
+  table.kpis { width: 100%; border-collapse: separate; border-spacing: 8px 0; margin: 0 -8px 18px; }
+  table.kpis td { border: 1px solid #ddd; border-radius: 4px; padding: 8px 12px; width: 33%; vertical-align: top; }
+  .k-label { font-size: 8pt; text-transform: uppercase; letter-spacing: .05em; color: #777; }
+  .k-value { font-size: 14pt; font-weight: 700; margin: 2px 0; }
+  table.lines tr.same-charge td { border-bottom: 0; padding-bottom: 2px; }
+  table.lines tr.subtotal td { padding-top: 2px; }
+  @media screen { .annex { margin-top: 48px; border-top: 2px dashed #ccc; padding-top: 24px; } }
+{% endblock %}
+
+{% block doc_title %}
+  <h1>{{ company.contract_title }}</h1>
+  <div class="number">{{ reference }}</div>
+  <div class="muted">{{ today|date:"d/m/Y" }}</div>
+{% endblock %}
+
+{% block content %}
+  <div class="meta">
+    <div class="box">
+      <h2>Prestador</h2>
+      <p><strong>{{ company.company_name }}</strong>{% if company.company_tax_id %}
+NIF {{ company.company_tax_id }}{% endif %}{% if company.company_address %}
+{{ company.company_address }}{% endif %}</p>
+    </div>
+    <div class="box">
+      <h2>Cliente</h2>
+      <p><strong>{{ customer.billing_name }}</strong>{% if customer.company %}
+Representada por {{ customer.name }}{% endif %}{% if customer.tax_id %}
+NIF {{ customer.tax_id }}{% endif %}{% if customer.full_address %}
+{{ customer.full_address }}{% endif %}
+{{ customer.notification_email }}</p>
+    </div>
+  </div>
+
+  <h2 class="section">Serviços contratados</h2>
+  <table class="lines">
+    <thead>
+      <tr><th>Serviço</th><th>Periodicidade</th><th class="num">Qtd.</th><th class="num">Valor por período</th>{% if has_setup_fees %}<th class="num">Taxa de ativação</th>{% endif %}</tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td>{{ item.label }}</td>
+        <td>{{ item.get_cycle_display }}</td>
+        <td class="num">{{ item.quantity }}</td>
+        <td class="num">{{ item.total|euros }}</td>
+        {% if has_setup_fees %}<td class="num">{% if item.pending_setup_fee %}{{ item.pending_setup_fee|euros }}{% else %}—{% endif %}</td>{% endif %}
+      </tr>
+      {% endfor %}
+      <tr class="total-row"><td colspan="3" class="num">Valor médio mensal</td><td class="num">{{ subscription.monthly_value|euros }}</td>{% if has_setup_fees %}<td></td>{% endif %}</tr>
+    </tbody>
+  </table>
+
+  <h2 class="section">Duração</h2>
+  <div class="section-body">
+    <p>O contrato tem início a <strong>{{ subscription.start_date|date:"d/m/Y" }}</strong>{% if subscription.end_date %} e termina a <strong>{{ subscription.end_date|date:"d/m/Y" }}</strong>.{% else %} e não tem termo: renova-se automaticamente no fim de cada período, até ser cancelado por qualquer das partes.{% endif %}</p>
+  </div>
+
+  <h2 class="section">Preço e pagamento</h2>
+  <div class="section-body">
+    <p>Cada período é cobrado antecipadamente. A {{ company.document_title|lower }} é enviada por email {{ company.days_before_due }} dia{{ company.days_before_due|pluralize }} antes do vencimento, que coincide com o início do período.{% if summary.next %} A primeira cobrança, de {{ summary.next.total|euros }}, vence a {{ summary.next.due_date|date:"d/m/Y" }}.{% endif %} As datas e valores previstos para os próximos 12 meses constam do anexo.</p>
+    {% if company.bank_details %}<p>Pagamento por transferência bancária{% for label, value in company.bank_details %}{% if forloop.first %} — {% else %}, {% endif %}{{ label }}: {{ value }}{% endfor %}.</p>{% endif %}
+  </div>
+
+  {% if terms %}
+  <h2 class="section">Condições gerais</h2>
+  <div class="terms">
+    {% for heading, body in terms %}<p>{% if heading %}<strong>{{ heading }}</strong><br>{% endif %}{{ body|linebreaksbr }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="signatures">
+    <div><div class="line">Pelo prestador — {{ company.company_name }}</div></div>
+    <div><div class="line">O cliente — {{ customer.billing_name }}</div></div>
+  </div>
+
+  <div class="annex">
+    <h1>Anexo — Plano de pagamentos (próximos 12 meses)</h1>
+    {% include "billing/_plan_table.html" %}
+  </div>
+{% endblock %}
+
+{% block footer %}{% endblock %}

@@ -44,6 +44,36 @@ Obrigado pela confiança! Abaixo encontra os serviços da sua subscrição{% if 
 
 Antes de cada vencimento receberá a respetiva {{ company.document_title|lower }} por email."""
 
+DEFAULT_CONTRACT_SUBJECT = (
+    "{{ company.contract_title }} — {{ subscription.name|default:company.company_name }}"
+)
+DEFAULT_CONTRACT_BODY = """Olá {{ customer.name }},
+
+Enviamos em anexo o contrato dos serviços da sua subscrição{% if subscription.name %} “{{ subscription.name }}”{% endif %} e o respetivo plano de pagamentos. Abaixo encontra o resumo dos serviços e das próximas cobranças.
+
+Se concordar, agradecemos que nos devolva uma cópia assinada. Para qualquer questão, basta responder a este email."""
+
+DEFAULT_CONTRACT_TERMS = """1. Prestação dos serviços
+{{ company.company_name }} compromete-se a prestar os serviços contratados com diligência e a informar o cliente, com a antecedência possível, de interrupções programadas.
+
+2. Obrigações do cliente
+O cliente compromete-se a pagar cada cobrança até à data de vencimento e a utilizar os serviços de acordo com a lei, sendo o único responsável pelos conteúdos que aloja.
+
+3. Falta de pagamento
+A falta de pagamento por mais de 15 dias após o vencimento pode levar à suspensão dos serviços até à regularização.
+
+4. Renovação e cancelamento
+Salvo data de fim indicada, o contrato renova-se automaticamente no fim de cada período. Qualquer das partes pode cancelá-lo por escrito, incluindo por email, com 30 dias de antecedência em relação ao fim do período em curso. Os períodos já iniciados não são reembolsáveis.
+
+5. Alteração de preços
+Alterações de preço são comunicadas com pelo menos 30 dias de antecedência e aplicam-se a partir do período seguinte.
+
+6. Proteção de dados
+Os dados pessoais do cliente são tratados apenas para a gestão deste contrato e da faturação, nos termos do RGPD.
+
+7. Disposições finais
+Em tudo o que não estiver previsto neste contrato aplica-se a lei portuguesa."""
+
 DEFAULT_PAYMENT_INSTRUCTIONS = (
     "Indique o número do documento no descritivo da transferência "
     "e envie o comprovativo para este email."
@@ -54,6 +84,15 @@ def validate_day_list(value):
     for part in (value or "").split(","):
         if part.strip() and not part.strip().isdigit():
             raise ValidationError("Use números inteiros separados por vírgulas, ex.: 7,3,1")
+
+
+def validate_template(value):
+    from django.template import Template, TemplateSyntaxError
+
+    try:
+        Template(value)
+    except TemplateSyntaxError as exc:
+        raise ValidationError(f"Erro no modelo: {exc}") from exc
 
 
 class SiteSettings(models.Model):
@@ -96,6 +135,20 @@ class SiteSettings(models.Model):
         default=True,
         help_text="Se desligado, as cobranças só são geradas manualmente "
         "(ação “Gerar próxima cobrança” nas subscrições).",
+    )
+
+    # Contrato
+    contract_title = models.CharField(
+        "título do contrato", max_length=100, default="Contrato de prestação de serviços"
+    )
+    contract_terms = models.TextField(
+        "condições gerais",
+        blank=True,
+        default=DEFAULT_CONTRACT_TERMS,
+        validators=[validate_template],
+        help_text="Aparecem no contrato depois dos serviços, duração e pagamento (preenchidos "
+        "automaticamente). Sintaxe de templates Django: <code>customer</code>, "
+        "<code>subscription</code>, <code>company</code>.",
     )
 
     # Pagamento por transferência bancária
@@ -154,6 +207,10 @@ class SiteSettings(models.Model):
     subscription_body = models.TextField(
         "plano de pagamentos — mensagem", default=DEFAULT_SUBSCRIPTION_BODY
     )
+    contract_subject = models.CharField(
+        "contrato — assunto", max_length=200, default=DEFAULT_CONTRACT_SUBJECT
+    )
+    contract_body = models.TextField("contrato — mensagem", default=DEFAULT_CONTRACT_BODY)
 
     # SMTP
     smtp_host = models.CharField("servidor SMTP", max_length=200, blank=True)

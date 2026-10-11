@@ -1,0 +1,51 @@
+{% extends "billing/document_base.html" %}
+
+{% block title %}Plano de pagamentos — {{ subscription }}{% endblock %}
+
+{% block extra_style %}
+  table.kpis { width: 100%; border-collapse: separate; border-spacing: 8px 0; margin: 0 -8px 18px; }
+  table.kpis td { border: 1px solid #ddd; border-radius: 4px; padding: 8px 12px; width: 33%; vertical-align: top; }
+  .k-label { font-size: 8pt; text-transform: uppercase; letter-spacing: .05em; color: #777; }
+  .k-value { font-size: 14pt; font-weight: 700; margin: 2px 0; }
+  table.lines tr.same-charge td { border-bottom: 0; padding-bottom: 2px; }
+  table.lines tr.subtotal td { padding-top: 2px; }
+{% endblock %}
+
+{% block doc_title %}
+  <h1>Plano de pagamentos</h1>
+  <div class="number">{{ subscription.name|default:reference }}</div>
+  <div class="muted">Emitido a {{ today|date:"d/m/Y" }}</div>
+{% endblock %}
+
+{% block content %}
+  <div class="meta">
+    <div class="box">
+      <h2>Cliente</h2>
+      <p><strong>{{ customer.billing_name }}</strong>{% if customer.tax_id %}
+NIF {{ customer.tax_id }}{% endif %}{% if customer.full_address %}
+{{ customer.full_address }}{% endif %}</p>
+    </div>
+    <div class="box">
+      <table class="dates">
+        <tr><td>Referência</td><td>{{ reference }}</td></tr>
+        <tr><td>Início</td><td>{{ subscription.start_date|date:"d/m/Y" }}</td></tr>
+        {% if subscription.end_date %}<tr><td>Fim</td><td>{{ subscription.end_date|date:"d/m/Y" }}</td></tr>{% endif %}
+      </table>
+    </div>
+  </div>
+
+  {% include "billing/_plan_table.html" %}
+
+  {% if summary.charges and company.bank_details %}
+  <div class="payment">
+    <h2>Pagamento por transferência bancária</h2>
+    <table>
+      {% for label, value in company.bank_details %}<tr><td>{{ label }}</td><td>{% if label == "IBAN" %}<strong>{{ value }}</strong>{% else %}{{ value }}{% endif %}</td></tr>{% endfor %}
+    </table>
+    <p style="margin:8px 0 0">Antes de cada vencimento é enviada a respetiva {{ company.document_title|lower }}, com o montante e o descritivo a indicar na transferência.</p>
+  </div>
+  {% endif %}
+{% endblock %}
+
+{# não é um documento de cobrança: sem o rodapé “não serve de fatura” #}
+{% block footer %}{% endblock %}

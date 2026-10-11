@@ -323,6 +323,7 @@ class Notification(models.Model):
         OVERDUE = "overdue", "Atraso"
         PAID = "paid", "Pagamento recebido"
         SUBSCRIPTION = "subscription", "Plano de pagamentos"
+        CONTRACT = "contract", "Contrato"
 
     invoice = models.ForeignKey(
         Invoice,

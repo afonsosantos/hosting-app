@@ -1,0 +1,34 @@
+{% load billing_format %}
+{% if summary.charges %}
+<table class="kpis">
+  <tr>
+    <td><div class="k-label">Próxima cobrança</div><div class="k-value">{{ summary.next.total|euros }}</div><div class="muted">vence a {{ summary.next.due_date|date:"d/m/Y" }}</div></td>
+    <td><div class="k-label">Total em 12 meses</div><div class="k-value">{{ summary.total|euros }}</div><div class="muted">{{ summary.charges|length }} cobrança{{ summary.charges|length|pluralize }}</div></td>
+    <td><div class="k-label">Média mensal</div><div class="k-value">{{ summary.monthly_average|euros }}</div><div class="muted">inclui taxas de ativação</div></td>
+  </tr>
+</table>
+
+<table class="lines">
+  <thead>
+    <tr><th>Vencimento</th><th>Descrição</th><th>Período</th><th class="num">Valor</th></tr>
+  </thead>
+  <tbody>
+    {% for charge in summary.charges %}
+      {% for line in charge.lines %}
+      <tr{% if not forloop.last %} class="same-charge"{% endif %}>
+        <td>{% if forloop.first %}<strong>{{ charge.due_date|date:"d/m/Y" }}</strong>{% endif %}</td>
+        <td>{{ line.description }}</td>
+        <td class="muted">{% if line.start %}{{ line.start|date:"d/m/Y" }} a {{ line.end|date:"d/m/Y" }}{% endif %}</td>
+        <td class="num">{{ line.amount|euros }}</td>
+      </tr>
+      {% endfor %}
+      {% if charge.lines|length > 1 %}
+      <tr class="subtotal"><td></td><td colspan="2" class="muted">Total a pagar a {{ charge.due_date|date:"d/m/Y" }}</td><td class="num"><strong>{{ charge.total|euros }}</strong></td></tr>
+      {% endif %}
+    {% endfor %}
+    <tr class="total-row"><td colspan="3" class="num">Total em 12 meses</td><td class="num">{{ summary.total|euros }}</td></tr>
+  </tbody>
+</table>
+{% else %}
+<p class="muted">Sem cobranças previstas (sem produtos, inativa ou terminada).</p>
+{% endif %}

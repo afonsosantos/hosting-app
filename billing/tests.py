@@ -15,7 +15,8 @@ from core.models import SiteSettings
 from customers.models import Customer
 
 from .models import Invoice, Notification, Subscription, SubscriptionItem
-from .notifications import run_notifications, send_notification
+from .notifications import run_notifications, send_contract, send_notification
+from .pdf import render_contract_html
 from .schedule import payment_schedule
 from .services import (
     create_invoice_for_subscription,
@@ -24,7 +25,8 @@ from .services import (
     subscription_created,
 )
 
-FAKE_PDF = mock.patch("billing.pdf.render_invoice_pdf", return_value=b"%PDF-fake")
+# os templates são renderizados na mesma; só a conversão para PDF (WeasyPrint) é simulada
+FAKE_PDF = mock.patch("billing.pdf._html_to_pdf", return_value=b"%PDF-fake")
 
 
 class DatesTests(TestCase):
@@ -263,10 +265,49 @@ class NotificationTests(BillingTestCase):
         html = mail.outbox[0].alternatives[0].content
         self.assertIn("Plano de pagamentos — próximos 12 meses", html)
         self.assertIn("27,00 €", html)
+        [attachment] = mail.outbox[0].attachments
+        self.assertEqual(attachment.filename, f"plano_pagamentos_{sub.pk}.pdf")
+        plan_html = _pdf.call_args.args[0]
+        self.assertIn("Plano de pagamentos", plan_html)
+        self.assertIn("27,00 €", plan_html)
 
         self.cfg.notify_on_subscription = False
         self.cfg.save()
         self.assertFalse(subscription_created(sub))
+
+    def test_contract_email(self, _pdf):
+        sub = self.make_subscription(date(2026, 1, 1), BillingCycle.MONTHLY)
+        log = send_contract(sub)
+        self.assertTrue(log.success)
+        self.assertEqual(log.kind, Notification.Kind.CONTRACT)
+        message = mail.outbox[0]
+        self.assertIn("Contrato de prestação de serviços", message.subject)
+        self.assertEqual(
+            [a.filename for a in message.attachments],
+            [f"contrato_{sub.pk}.pdf", f"plano_pagamentos_{sub.pk}.pdf"],
+        )
+        self.assertIn("Contrato e plano de pagamentos em PDF", message.alternatives[0].content)
+
+    def test_contract_document(self, _pdf):
+        sub = self.make_subscription(date(2026, 1, 1))  # alojamento anual: taxa de ativação 10 €
+        self.cfg.company_name = "Silva & Filhos"
+        self.cfg.contract_terms = "1. Teste\n{{ company.company_name }} e {{ customer.name }}."
+        self.cfg.save()
+        html = render_contract_html(sub)
+        # condições gerais renderizadas como modelo, com o título a negrito e escapadas uma só vez
+        self.assertIn("<strong>1. Teste</strong><br>Silva &amp; Filhos e Ana.", html)
+        self.assertIn("não tem termo", html)
+        self.assertIn("Taxa de ativação", html)
+        self.assertIn("Anexo — Plano de pagamentos", html)
+        self.assertIn("145,00 €", html)  # 1.ª cobrança: 120 + 10 de ativação + 15 do domínio
+        sub.end_date = date(2026, 12, 31)
+        sub.save()
+        self.assertIn("termina a <strong>31/12/2026</strong>", render_contract_html(sub))
+
+    def test_contract_terms_must_be_valid_template(self, _pdf):
+        self.cfg.contract_terms = "{% if %}"
+        with self.assertRaises(ValidationError):
+            self.cfg.full_clean()
 
     def test_disabled_globally_or_per_customer(self, _pdf):
         due = date(2026, 6, 30)
@@ -307,6 +348,8 @@ class AdminSmokeTests(BillingTestCase):
             reverse("admin:customers_customer_change", args=[self.customer.pk]),
             reverse("admin:billing_subscription_changelist"),
             reverse("admin:billing_subscription_change", args=[sub.pk]),
+            reverse("admin:billing_subscription_add"),
+            reverse("admin:billing_subscription_contract", args=[sub.pk]),
             reverse("admin:billing_invoice_changelist") + "?due=overdue",
             reverse("admin:billing_invoice_changelist") + "?q=NC+2026/1",
             reverse("admin:billing_invoice_change", args=[invoice.pk]),
@@ -333,10 +376,7 @@ class AdminSmokeTests(BillingTestCase):
         page = self.client.get(reverse("admin:billing_subscription_change", args=[sub.pk]))
         self.assertContains(page, "27,00 €")
 
-    @FAKE_PDF
-    def test_create_subscription_in_admin_sends_plan(self, _pdf):
-        self.cfg.notifications_enabled = True
-        self.cfg.save()
+    def subscription_form_data(self, **extra):
         data = {
             "customer": self.customer.pk,
             "name": "Site a.pt",
@@ -352,7 +392,14 @@ class AdminSmokeTests(BillingTestCase):
         }
         for prefix in ("invoices", "notifications"):
             data |= {f"{prefix}-TOTAL_FORMS": "0", f"{prefix}-INITIAL_FORMS": "0"}
-        response = self.client.post(reverse("admin:billing_subscription_add"), data)
+        return data | extra
+
+    @FAKE_PDF
+    def test_create_subscription_in_admin_sends_plan(self, _pdf):
+        self.cfg.notifications_enabled = True
+        self.cfg.save()
+        url = reverse("admin:billing_subscription_add")
+        response = self.client.post(url, self.subscription_form_data())
 
         sub = Subscription.objects.get(name="Site a.pt")
         self.assertRedirects(response, reverse("admin:billing_subscription_change", args=[sub.pk]))
@@ -361,6 +408,25 @@ class AdminSmokeTests(BillingTestCase):
         )
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Plano de pagamentos", mail.outbox[0].subject)
+
+    @FAKE_PDF
+    def test_create_subscription_in_admin_sends_contract(self, _pdf):
+        # é uma escolha explícita no formulário: envia mesmo com as notificações desligadas
+        url = reverse("admin:billing_subscription_add")
+        self.client.post(url, self.subscription_form_data(send_contract="on"))
+
+        sub = Subscription.objects.get(name="Site a.pt")
+        self.assertEqual(len(mail.outbox), 1)  # só o contrato (que já inclui o plano)
+        self.assertIn("Contrato", mail.outbox[0].subject)
+        self.assertEqual(sub.notifications.get().kind, Notification.Kind.CONTRACT)
+
+    def test_subscription_pdfs(self):
+        sub = self.make_subscription(date(2026, 3, 1))
+        for name in ("billing_subscription_plan_pdf", "billing_subscription_contract_pdf"):
+            with self.subTest(name):
+                response = self.client.get(reverse(f"admin:{name}", args=[sub.pk]))
+                self.assertEqual(response["Content-Type"], "application/pdf")
+                self.assertTrue(response.content.startswith(b"%PDF"))
 
     def test_mark_paid_button(self):
         sub = self.make_subscription(date(2026, 3, 1))
