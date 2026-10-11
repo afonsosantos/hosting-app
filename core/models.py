@@ -3,6 +3,7 @@ from django.core.validators import RegexValidator
 from django.db import models
 
 from .dates import parse_day_list
+from .richtext import clean_html, text_to_html
 
 # Os textos têm só a mensagem: o resumo do documento, a tabela de produtos/plano,
 # os dados de pagamento e a assinatura são acrescentados pelo layout do email.
@@ -53,7 +54,7 @@ Enviamos em anexo o contrato dos serviços da sua subscrição{% if subscription
 
 Se concordar, agradecemos que nos devolva uma cópia assinada. Para qualquer questão, basta responder a este email."""
 
-DEFAULT_CONTRACT_TERMS = """1. Prestação dos serviços
+DEFAULT_CONTRACT_TERMS_TEXT = """1. Prestação dos serviços
 {{ company.company_name }} compromete-se a prestar os serviços contratados com diligência e a informar o cliente, com a antecedência possível, de interrupções programadas.
 
 2. Obrigações do cliente
@@ -73,6 +74,7 @@ Os dados pessoais do cliente são tratados apenas para a gestão deste contrato 
 
 7. Disposições finais
 Em tudo o que não estiver previsto neste contrato aplica-se a lei portuguesa."""
+DEFAULT_CONTRACT_TERMS = text_to_html(DEFAULT_CONTRACT_TERMS_TEXT)
 
 DEFAULT_PAYMENT_INSTRUCTIONS = (
     "Indique o número do documento no descritivo da transferência "
@@ -147,8 +149,8 @@ class SiteSettings(models.Model):
         default=DEFAULT_CONTRACT_TERMS,
         validators=[validate_template],
         help_text="Aparecem no contrato depois dos serviços, duração e pagamento (preenchidos "
-        "automaticamente). Sintaxe de templates Django: <code>customer</code>, "
-        "<code>subscription</code>, <code>company</code>.",
+        "automaticamente). Pode usar variáveis, ex.: <code>{{ company.company_name }}</code>, "
+        "<code>{{ customer.name }}</code>, <code>{{ subscription.name }}</code>.",
     )
 
     # Pagamento por transferência bancária
@@ -237,6 +239,7 @@ class SiteSettings(models.Model):
 
     def save(self, *args, **kwargs):
         self.pk = 1
+        self.contract_terms = clean_html(self.contract_terms)
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):

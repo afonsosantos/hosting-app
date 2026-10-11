@@ -1,0 +1,18 @@
+/* Editor Trix dentro do admin do Django (tema claro e escuro) */
+trix-toolbar { margin-bottom: 4px; }
+trix-toolbar .trix-button-group--file-tools { display: none; }
+trix-toolbar .trix-button-group { background: #fff; }
+trix-editor.richtext {
+  min-height: 22em;
+  max-width: 60em;
+  background: var(--body-bg);
+  color: var(--body-fg);
+  border-color: var(--border-color);
+  font-size: 14px;
+  line-height: 1.5;
+}
+trix-editor.richtext h1 { font-size: 1.15em; margin: 0; }
+trix-editor.richtext ul, trix-editor.richtext ol { margin-left: 1.5em; padding-left: 0; }
+trix-editor.richtext li { list-style: inherit; }
+trix-editor.richtext ul li { list-style-type: disc; }
+trix-editor.richtext ol li { list-style-type: decimal; }

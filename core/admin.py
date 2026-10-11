@@ -4,6 +4,7 @@ from django.urls import path, reverse
 
 from .email import build_email
 from .models import SiteSettings
+from .richtext import RichTextWidget
 
 
 @admin.register(SiteSettings)
@@ -108,6 +109,8 @@ class SiteSettingsAdmin(admin.ModelAdmin):
             from django import forms
 
             kwargs["widget"] = forms.PasswordInput(render_value=True)
+        if db_field.name == "contract_terms":
+            kwargs["widget"] = RichTextWidget()
         return super().formfield_for_dbfield(db_field, request, **kwargs)
 
     def has_add_permission(self, request):

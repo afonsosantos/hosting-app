@@ -7,7 +7,11 @@
   h2.section { font-size: 10pt; text-transform: uppercase; letter-spacing: .05em; margin: 24px 0 6px; padding-bottom: 3px; border-bottom: 1px solid #ddd; }
   .section-body p { margin: 0 0 6px; }
   .terms { line-height: 1.45; }
-  .terms p { margin: 0 0 8px; page-break-inside: avoid; }
+  .terms p { margin: 0; }
+  .terms h1, .terms h2, .terms h3 { font-size: 10.5pt; margin: 8px 0 2px; page-break-after: avoid; }
+  .terms ul, .terms ol { margin: 2px 0; padding-left: 20px; }
+  .terms blockquote { margin: 4px 0; padding-left: 10px; border-left: 3px solid #ddd; color: #555; }
+  .terms a { color: inherit; }
   .signatures { display: flex; gap: 48px; margin-top: 48px; page-break-inside: avoid; }
   .signatures > div { flex: 1; }
   .signatures .line { border-top: 1px solid #222; margin-top: 56px; padding-top: 4px; font-size: 9pt; }
@@ -78,9 +82,7 @@ NIF {{ customer.tax_id }}{% endif %}{% if customer.full_address %}
 
   {% if terms %}
   <h2 class="section">Condições gerais</h2>
-  <div class="terms">
-    {% for heading, body in terms %}<p>{% if heading %}<strong>{{ heading }}</strong><br>{% endif %}{{ body|linebreaksbr }}</p>{% endfor %}
-  </div>
+  <div class="terms">{{ terms }}</div>
   {% endif %}
 
   <div class="signatures">

@@ -12,6 +12,7 @@ from django.utils import timezone
 from catalog.models import BillingCycle, PricePlan, Product
 from core.dates import add_months, parse_day_list
 from core.models import SiteSettings
+from core.richtext import text_to_html
 from customers.models import Customer
 
 from .models import Invoice, Notification, Subscription, SubscriptionItem
@@ -291,8 +292,12 @@ class NotificationTests(BillingTestCase):
     def test_contract_document(self, _pdf):
         sub = self.make_subscription(date(2026, 1, 1))  # alojamento anual: taxa de ativação 10 €
         self.cfg.company_name = "Silva & Filhos"
-        self.cfg.contract_terms = "1. Teste\n{{ company.company_name }} e {{ customer.name }}."
+        self.cfg.contract_terms = (
+            "<div><strong>1. Teste</strong><br>{{ company.company_name }} e {{ customer.name }}."
+            "<script>alert(1)</script></div>"
+        )
         self.cfg.save()
+        self.assertNotIn("script", self.cfg.contract_terms)  # HTML limpo ao guardar
         html = render_contract_html(sub)
         # condições gerais renderizadas como modelo, com o título a negrito e escapadas uma só vez
         self.assertIn("<strong>1. Teste</strong><br>Silva &amp; Filhos e Ana.", html)
@@ -303,6 +308,12 @@ class NotificationTests(BillingTestCase):
         sub.end_date = date(2026, 12, 31)
         sub.save()
         self.assertIn("termina a <strong>31/12/2026</strong>", render_contract_html(sub))
+
+    def test_contract_terms_text_to_html(self, _pdf):
+        self.assertEqual(
+            text_to_html('1. A & B\n{{ d|date:"Y" }}\n\nFim.'),
+            '<div><strong>1. A &amp; B</strong><br>{{ d|date:"Y" }}<br><br>Fim.</div>',
+        )
 
     def test_contract_terms_must_be_valid_template(self, _pdf):
         self.cfg.contract_terms = "{% if %}"
@@ -364,9 +375,8 @@ class AdminSmokeTests(BillingTestCase):
             self.client.get(reverse("admin:core_sitesettings_changelist")),
             reverse("admin:core_sitesettings_change", args=[1]),
         )
-        self.assertEqual(
-            self.client.get(reverse("admin:core_sitesettings_change", args=[1])).status_code, 200
-        )
+        settings_page = self.client.get(reverse("admin:core_sitesettings_change", args=[1]))
+        self.assertContains(settings_page, '<trix-editor input="id_contract_terms"')
 
     def test_payment_schedule(self):
         sub = self.make_subscription(date(2026, 1, 1), BillingCycle.MONTHLY)
