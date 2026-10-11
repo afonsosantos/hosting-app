@@ -1,0 +1,138 @@
+{% load billing_format %}<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>{{ subject }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;-webkit-text-size-adjust:100%;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f4f6;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#ffffff;border-radius:8px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;font-size:15px;line-height:1.55;">
+
+  {# Cabeçalho #}
+  <tr><td style="background:{{ company.brand_color }};padding:20px 28px;">
+    <div style="color:#ffffff;font-size:19px;font-weight:600;">{{ company.company_name }}</div>
+    {% if document %}<div style="color:#ffffff;opacity:.85;font-size:13px;margin-top:2px;">{{ company.document_title }} {{ document.number }}</div>
+    {% elif subscription %}<div style="color:#ffffff;opacity:.85;font-size:13px;margin-top:2px;">Plano de pagamentos</div>{% endif %}
+  </td></tr>
+
+  {# Mensagem #}
+  <tr><td style="padding:28px 28px 8px;">
+    {{ message|linebreaks }}
+  </td></tr>
+
+  {# Resumo do documento #}
+  {% if document %}
+  <tr><td style="padding:8px 28px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb;border-radius:8px;">
+      <tr><td style="padding:18px 20px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="vertical-align:top;">
+              <div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;">{% if kind == "paid" %}Valor pago{% else %}Valor a pagar{% endif %}</div>
+              <div style="font-size:28px;font-weight:700;color:#111827;line-height:1.2;margin-top:2px;">{{ document.total|euros }}</div>
+            </td>
+            <td align="right" style="vertical-align:top;">
+              <div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;">{{ company.document_title }}</div>
+              <div style="font-size:15px;font-weight:600;margin-top:2px;">{{ document.number }}</div>
+            </td>
+          </tr>
+        </table>
+        {% if headline %}
+        <div style="margin-top:14px;padding:8px 12px;border-radius:6px;font-size:14px;font-weight:600;
+          {% if tone == 'danger' %}background:#fee2e2;color:#b91c1c;{% elif tone == 'warning' %}background:#fef3c7;color:#92400e;{% elif tone == 'success' %}background:#dcfce7;color:#166534;{% else %}background:#f3f4f6;color:#374151;{% endif %}">{{ headline }}</div>
+        {% endif %}
+        {% if document.period_start %}<div style="margin-top:10px;font-size:13px;color:#6b7280;">Período: {{ document.period_start|date:"d/m/Y" }} a {{ document.period_end|date:"d/m/Y" }}</div>{% endif %}
+      </td></tr>
+    </table>
+  </td></tr>
+  {% endif %}
+
+  {# Linhas do documento #}
+  {% if show_lines %}
+  <tr><td style="padding:12px 28px 4px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;">
+      {% for line in lines %}
+      <tr>
+        <td style="padding:9px 0;border-bottom:1px solid #f0f1f3;">{{ line.description }}{% if line.quantity != 1 %} <span style="color:#6b7280;">× {{ line.quantity|floatformat:"-2" }}</span>{% endif %}</td>
+        <td align="right" style="padding:9px 0 9px 12px;border-bottom:1px solid #f0f1f3;white-space:nowrap;">{{ line.total|euros }}</td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td style="padding:10px 0;font-weight:600;">Total</td>
+        <td align="right" style="padding:10px 0 10px 12px;font-weight:700;white-space:nowrap;">{{ document.total|euros }}</td>
+      </tr>
+    </table>
+  </td></tr>
+  {% endif %}
+
+  {# Serviços e plano de pagamentos #}
+  {% if subscription %}
+  <tr><td style="padding:16px 28px 4px;">
+    <div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:6px;">Serviços</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;">
+      {% for item in items %}
+      <tr>
+        <td style="padding:9px 0;border-bottom:1px solid #f0f1f3;">{{ item.label }}</td>
+        <td style="padding:9px 12px;border-bottom:1px solid #f0f1f3;color:#6b7280;white-space:nowrap;">{{ item.get_cycle_display }}</td>
+        <td align="right" style="padding:9px 0;border-bottom:1px solid #f0f1f3;white-space:nowrap;">{{ item.total|euros }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </td></tr>
+  {% if plan %}
+  <tr><td style="padding:20px 28px 4px;">
+    <div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:6px;">Plano de pagamentos — próximos 12 meses</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;border:1px solid #e5e7eb;border-radius:8px;">
+      {% for charge in plan %}
+      <tr>
+        <td style="padding:10px 14px;{% if not forloop.last %}border-bottom:1px solid #f0f1f3;{% endif %}white-space:nowrap;vertical-align:top;font-weight:600;">{{ charge.due_date|date:"d/m/Y" }}</td>
+        <td style="padding:10px 6px;{% if not forloop.last %}border-bottom:1px solid #f0f1f3;{% endif %}color:#4b5563;font-size:13px;">{% for line in charge.lines %}{{ line.description }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
+        <td align="right" style="padding:10px 14px;{% if not forloop.last %}border-bottom:1px solid #f0f1f3;{% endif %}white-space:nowrap;vertical-align:top;font-weight:600;">{{ charge.total|euros }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </td></tr>
+  {% endif %}
+  {% endif %}
+
+  {# Como pagar #}
+  {% if show_payment %}
+  <tr><td style="padding:20px 28px 4px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f8fafc;border-left:4px solid {{ company.brand_color }};border-radius:6px;">
+      <tr><td style="padding:16px 18px;">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:8px;">Pagamento por transferência bancária</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;">
+          {% for label, value in company.bank_details %}
+          <tr><td style="padding:2px 16px 2px 0;color:#6b7280;white-space:nowrap;">{{ label }}</td><td style="padding:2px 0;{% if label == 'IBAN' %}font-weight:700;font-family:Menlo,Consolas,monospace;letter-spacing:.02em;{% endif %}">{{ value }}</td></tr>
+          {% endfor %}
+          {% if document %}
+          <tr><td style="padding:2px 16px 2px 0;color:#6b7280;">Montante</td><td style="padding:2px 0;font-weight:700;">{{ document.total|euros }}</td></tr>
+          <tr><td style="padding:2px 16px 2px 0;color:#6b7280;">Descritivo</td><td style="padding:2px 0;">{{ document.number }}</td></tr>
+          {% endif %}
+        </table>
+        {% if company.payment_instructions %}<div style="margin-top:10px;font-size:13px;color:#4b5563;">{{ company.payment_instructions|linebreaksbr }}</div>{% endif %}
+      </td></tr>
+    </table>
+  </td></tr>
+  {% endif %}
+
+  {% if has_attachment %}
+  <tr><td style="padding:14px 28px 0;font-size:13px;color:#6b7280;">📎 Documento em PDF em anexo.</td></tr>
+  {% endif %}
+
+  {# Assinatura / rodapé #}
+  <tr><td style="padding:28px 28px 24px;">
+    <div style="border-top:1px solid #e5e7eb;padding-top:16px;font-size:13px;color:#6b7280;line-height:1.6;">
+      <strong style="color:#374151;">{{ company.company_name }}</strong><br>
+      {% if company.company_email %}<a href="mailto:{{ company.company_email }}" style="color:{{ company.brand_color }};text-decoration:none;">{{ company.company_email }}</a>{% endif %}{% if company.company_email and company.company_phone %} · {% endif %}{{ company.company_phone }}
+      {% if company.company_website %}<br><a href="{% if '://' not in company.company_website %}https://{% endif %}{{ company.company_website }}" style="color:{{ company.brand_color }};text-decoration:none;">{{ company.company_website }}</a>{% endif %}
+    </div>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

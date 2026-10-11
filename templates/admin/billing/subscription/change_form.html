@@ -1,0 +1,18 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+  {% if original.pk %}
+    <li>
+      <form method="post" action="{% url 'admin:billing_subscription_send_plan' original.pk %}">
+        {% csrf_token %}
+        <button type="submit">Enviar plano por email</button>
+      </form>
+    </li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}
+
+{% block after_related_objects %}
+  {{ block.super }}
+  {% include "admin/billing/subscription/payment_plan.html" %}
+{% endblock %}

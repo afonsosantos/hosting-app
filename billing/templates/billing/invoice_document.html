@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<title>{{ company.document_title }} {{ document.number }}</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 22mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; color: #222; margin: 0; }
+  .sheet { max-width: 800px; margin: 0 auto; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+  .logo { max-height: 60px; max-width: 220px; margin-bottom: 8px; }
+  .company { font-size: 9pt; color: #555; }
+  .company div { white-space: pre-line; }
+  .company strong { color: #222; font-size: 11pt; }
+  .doc-title { text-align: right; }
+  .doc-title h1 { margin: 0; font-size: 18pt; font-weight: 600; }
+  .doc-title .number { font-size: 12pt; margin-top: 2px; }
+  .status { display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 3px; font-size: 9pt; font-weight: 600; }
+  .status-paid { background: #e3f4e6; color: #1d6b2c; }
+  .status-pending { background: #fff4d6; color: #8a5a00; }
+  .status-cancelled { background: #f6dede; color: #8c1d1d; }
+  .meta { display: flex; justify-content: space-between; gap: 24px; margin: 28px 0 20px; }
+  .box { flex: 1; }
+  .box h2 { font-size: 8pt; text-transform: uppercase; letter-spacing: .05em; color: #777; margin: 0 0 4px; }
+  .box p { margin: 0; white-space: pre-line; }
+  table.dates td { padding: 1px 0; }
+  table.dates td:first-child { color: #777; padding-right: 12px; }
+  table.lines { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  table.lines th { text-align: left; font-size: 8pt; text-transform: uppercase; letter-spacing: .05em; color: #777; border-bottom: 1.5px solid #222; padding: 6px 4px; }
+  table.lines td { border-bottom: 1px solid #ddd; padding: 7px 4px; vertical-align: top; }
+  .num { text-align: right; white-space: nowrap; }
+  .total-row td { border-bottom: 0; font-size: 12pt; font-weight: 700; padding-top: 12px; }
+  .payment { margin-top: 28px; padding: 12px 14px; background: #f5f6f8; border-radius: 4px; }
+  .payment h2 { font-size: 9pt; text-transform: uppercase; letter-spacing: .05em; margin: 0 0 6px; }
+  .payment table td { padding: 1px 12px 1px 0; }
+  .payment td:first-child { color: #666; }
+  .notes { margin-top: 18px; white-space: pre-line; }
+  footer { margin-top: 32px; font-size: 8pt; color: #777; white-space: pre-line; border-top: 1px solid #ddd; padding-top: 8px; }
+  .print-bar { text-align: right; padding: 12px 0; }
+  @media print { .print-bar { display: none; } }
+</style>
+</head>
+<body>
+<div class="sheet">
+  {% if for_print %}<div class="print-bar"><button onclick="window.print()">Imprimir / Guardar PDF</button></div>{% endif %}
+  <header>
+    <div class="company">
+      {% if logo %}<div><img class="logo" src="{{ logo }}" alt=""></div>{% endif %}
+      <div><strong>{{ company.company_name }}</strong></div>
+      {% if company.company_tax_id %}<div>NIF {{ company.company_tax_id }}</div>{% endif %}
+      {% if company.company_address %}<div>{{ company.company_address }}</div>{% endif %}
+      {% if company.company_email or company.company_phone %}<div>{{ company.company_email }}{% if company.company_email and company.company_phone %} · {% endif %}{{ company.company_phone }}</div>{% endif %}
+      {% if company.company_website %}<div>{{ company.company_website }}</div>{% endif %}
+    </div>
+    <div class="doc-title">
+      <h1>{{ company.document_title }}</h1>
+      <div class="number">{{ document.number }}</div>
+      <span class="status status-{{ document.status }}">{{ document.get_status_display }}{% if document.status == "paid" and document.paid_on %} em {{ document.paid_on|date:"d/m/Y" }}{% endif %}</span>
+    </div>
+  </header>
+
+  <div class="meta">
+    <div class="box">
+      <h2>Cliente</h2>
+      <p><strong>{{ document.billing_name }}</strong>{% if document.billing_tax_id %}
+NIF {{ document.billing_tax_id }}{% endif %}{% if document.billing_address %}
+{{ document.billing_address }}{% endif %}</p>
+    </div>
+    <div class="box">
+      <table class="dates">
+        <tr><td>Data de emissão</td><td>{{ document.issue_date|date:"d/m/Y" }}</td></tr>
+        <tr><td>Data de vencimento</td><td><strong>{{ document.due_date|date:"d/m/Y" }}</strong></td></tr>
+        {% if document.period_start %}<tr><td>Período</td><td>{{ document.period_start|date:"d/m/Y" }} a {{ document.period_end|date:"d/m/Y" }}</td></tr>{% endif %}
+      </table>
+    </div>
+  </div>
+
+  <table class="lines">
+    <thead>
+      <tr><th>Descrição</th><th class="num">Qtd.</th><th class="num">Preço unit.</th><th class="num">Total</th></tr>
+    </thead>
+    <tbody>
+      {% for line in lines %}
+      <tr>
+        <td>{{ line.description }}</td>
+        <td class="num">{{ line.quantity|floatformat:"-2" }}</td>
+        <td class="num">{{ line.unit_price|floatformat:2 }} €</td>
+        <td class="num">{{ line.total|floatformat:2 }} €</td>
+      </tr>
+      {% endfor %}
+      <tr class="total-row"><td colspan="3" class="num">Total</td><td class="num">{{ document.total|floatformat:2 }} €</td></tr>
+    </tbody>
+  </table>
+
+  {% if document.status == "pending" %}
+  <div class="payment">
+    <h2>Pagamento por transferência bancária</h2>
+    <table>
+      {% if company.bank_account_holder %}<tr><td>Titular</td><td>{{ company.bank_account_holder }}</td></tr>{% endif %}
+      {% if company.bank_name %}<tr><td>Banco</td><td>{{ company.bank_name }}</td></tr>{% endif %}
+      {% if company.iban %}<tr><td>IBAN</td><td><strong>{{ company.iban }}</strong></td></tr>{% endif %}
+      {% if company.bic_swift %}<tr><td>BIC/SWIFT</td><td>{{ company.bic_swift }}</td></tr>{% endif %}
+      <tr><td>Montante</td><td><strong>{{ document.total|floatformat:2 }} €</strong></td></tr>
+      <tr><td>Descritivo</td><td>{{ document.number }}</td></tr>
+    </table>
+    {% if company.payment_instructions %}<p style="margin:8px 0 0">{{ company.payment_instructions }}</p>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if document.notes %}<div class="notes">{{ document.notes }}</div>{% endif %}
+
+  {% if company.document_footer %}<footer>{{ company.document_footer }}</footer>{% endif %}
+</div>
+</body>
+</html>

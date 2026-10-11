@@ -1,0 +1,76 @@
+{% load billing_format %}
+<style>
+  .plan { margin: 20px 0 30px; }
+  .plan h2 { margin: 0; }
+  .plan-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; padding: 14px 0; }
+  .plan-kpi { border: 1px solid var(--hairline-color); border-radius: 6px; padding: 10px 14px; }
+  .plan-kpi .k-label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--body-quiet-color); }
+  .plan-kpi .k-value { font-size: 20px; font-weight: 600; margin-top: 2px; }
+  .plan-kpi .k-sub { font-size: 12px; color: var(--body-quiet-color); }
+  .plan-list { border: 1px solid var(--hairline-color); border-radius: 6px; overflow: hidden; }
+  .plan-row { display: grid; grid-template-columns: 74px 1fr auto; gap: 16px; align-items: start; padding: 12px 16px; border-top: 1px solid var(--hairline-color); }
+  .plan-row:first-child { border-top: 0; }
+  .plan-row.is-next { background: var(--selected-row); }
+  .plan-date { text-align: center; border-radius: 6px; padding: 4px 0; background: var(--darkened-bg); line-height: 1.15; }
+  .plan-date .d { font-size: 20px; font-weight: 700; }
+  .plan-date .m { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--body-quiet-color); }
+  .plan-lines { list-style: none; margin: 0; padding: 0; }
+  .plan-lines li { list-style: none; margin: 0 0 4px; padding: 0; font-size: 13px; }
+  .plan-lines .period { color: var(--body-quiet-color); font-size: 12px; }
+  .plan-tag { display: inline-block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 3px; margin-left: 4px; vertical-align: 1px; background: var(--darkened-bg); color: var(--body-quiet-color); }
+  .plan-tag.annual { background: rgba(65, 118, 144, .18); color: var(--link-fg); }
+  .plan-tag.setup { background: rgba(245, 158, 11, .2); color: #b45309; }
+  .plan-tag.next { background: var(--primary); color: var(--primary-fg); }
+  .plan-amount { font-size: 16px; font-weight: 600; white-space: nowrap; text-align: right; }
+  .plan-amount .line-amounts { font-size: 12px; font-weight: 400; color: var(--body-quiet-color); }
+  .plan-empty { padding: 14px 0; color: var(--body-quiet-color); }
+</style>
+
+<div class="plan module">
+  <h2>Plano de pagamentos — próximos 12 meses</h2>
+  {% if not summary.charges %}
+    <p class="plan-empty">{% if not original.pk %}Guarde a subscrição para ver o plano de pagamentos.{% else %}Sem cobranças previstas (sem produtos, inativa ou terminada).{% endif %}</p>
+  {% else %}
+    <div class="plan-kpis">
+      <div class="plan-kpi">
+        <div class="k-label">Próxima cobrança</div>
+        <div class="k-value">{{ summary.next.total|euros }}</div>
+        <div class="k-sub">vence a {{ summary.next.due_date|date:"d/m/Y" }}</div>
+      </div>
+      <div class="plan-kpi">
+        <div class="k-label">Total em 12 meses</div>
+        <div class="k-value">{{ summary.total|euros }}</div>
+        <div class="k-sub">{{ summary.charges|length }} cobrança{{ summary.charges|length|pluralize }}</div>
+      </div>
+      <div class="plan-kpi">
+        <div class="k-label">Média mensal</div>
+        <div class="k-value">{{ summary.monthly_average|euros }}</div>
+        <div class="k-sub">inclui taxas de ativação</div>
+      </div>
+    </div>
+
+    <div class="plan-list">
+      {% for charge in summary.charges %}
+      <div class="plan-row{% if forloop.first %} is-next{% endif %}">
+        <div class="plan-date">
+          <div class="d">{{ charge.due_date|date:"d" }}</div>
+          <div class="m">{{ charge.due_date|date:"M Y" }}</div>
+        </div>
+        <ul class="plan-lines">
+          {% for line in charge.lines %}
+          <li>
+            {% if line.is_setup_fee %}{{ line.description }} <span class="plan-tag setup">ativação</span>
+            {% else %}{{ line.label }} <span class="plan-tag{% if line.item.cycle >= 12 %} annual{% endif %}">{{ line.cycle }}</span>
+            <span class="period">· {{ line.start|date:"d/m/Y" }} a {{ line.end|date:"d/m/Y" }}</span>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="plan-amount">
+          {{ charge.total|euros }}
+          {% if forloop.first %}<div><span class="plan-tag next">próxima</span></div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

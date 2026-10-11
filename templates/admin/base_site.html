@@ -1,0 +1,26 @@
+{% extends "admin/base_site.html" %}
+
+{% block extrastyle %}{{ block.super }}
+<style>
+  /* Botões (POST) nas ferramentas do topo com o mesmo aspeto dos links do admin */
+  .object-tools form { display: inline; margin: 0; }
+  .object-tools button {
+    display: block;
+    float: left;
+    border: 0;
+    border-radius: 15px;
+    padding: 3px 12px;
+    background: var(--object-tools-bg);
+    color: var(--object-tools-fg);
+    font-family: inherit;
+    font-weight: 400;
+    font-size: 0.6875rem;
+    line-height: inherit;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+  }
+  .object-tools button:focus,
+  .object-tools button:hover { background-color: var(--object-tools-hover-bg); }
+</style>
+{% endblock %}

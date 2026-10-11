@@ -1,0 +1,59 @@
+<style>
+  .dash { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .dash a { text-decoration: none; color: inherit; }
+  .dash .card { border: 1px solid var(--hairline-color); border-radius: 6px; padding: 12px 14px; background: var(--body-bg); height: 100%; box-sizing: border-box; }
+  .dash .label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--body-quiet-color); }
+  .dash .value { font-size: 22px; font-weight: 600; margin-top: 4px; }
+  .dash .sub { font-size: 12px; color: var(--body-quiet-color); }
+  .dash .alert .value { color: var(--error-fg); }
+</style>
+<div class="dash">
+  <a href="{% url 'admin:billing_invoice_changelist' %}?due=overdue">
+    <div class="card {% if overdue.count %}alert{% endif %}">
+      <div class="label">Em atraso</div>
+      <div class="value">{{ overdue.total|floatformat:2 }} €</div>
+      <div class="sub">{{ overdue.count }} cobrança{{ overdue.count|pluralize }}</div>
+    </div>
+  </a>
+  <a href="{% url 'admin:billing_invoice_changelist' %}?due=next30">
+    <div class="card">
+      <div class="label">Vence em 30 dias</div>
+      <div class="value">{{ upcoming.total|floatformat:2 }} €</div>
+      <div class="sub">{{ upcoming.count }} cobrança{{ upcoming.count|pluralize }}</div>
+    </div>
+  </a>
+  <a href="{% url 'admin:billing_invoice_changelist' %}?status__exact=pending">
+    <div class="card">
+      <div class="label">Total por receber</div>
+      <div class="value">{{ pending.total|floatformat:2 }} €</div>
+      <div class="sub">{{ pending.count }} cobrança{{ pending.count|pluralize }}</div>
+    </div>
+  </a>
+  <div class="card">
+    <div class="label">Recebido este mês</div>
+    <div class="value">{{ paid_month.total|floatformat:2 }} €</div>
+    <div class="sub">{{ paid_month.count }} pagamento{{ paid_month.count|pluralize }}</div>
+  </div>
+  <a href="{% url 'admin:billing_subscription_changelist' %}?status__exact=active">
+    <div class="card">
+      <div class="label">Receita mensal recorrente</div>
+      <div class="value">{{ monthly|floatformat:2 }} €</div>
+      <div class="sub">{{ active_count }} subscriç{{ active_count|pluralize:"ão,ões" }} ativa{{ active_count|pluralize }}</div>
+    </div>
+  </a>
+</div>
+{% if overdue_list %}
+<div class="module" style="margin-bottom:20px">
+  <table style="width:100%">
+    <caption>Cobranças em atraso</caption>
+    {% for inv in overdue_list %}
+    <tr>
+      <td><a href="{% url 'admin:billing_invoice_change' inv.pk %}">{{ inv.number }}</a></td>
+      <td>{{ inv.customer }}</td>
+      <td>venceu a {{ inv.due_date|date:"d/m/Y" }}</td>
+      <td style="text-align:right">{{ inv.total|floatformat:2 }} €</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}

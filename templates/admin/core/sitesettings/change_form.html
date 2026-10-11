@@ -1,0 +1,10 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+  <li>
+    <form method="post" action="{% url 'admin:core_sitesettings_test_email' %}" style="display:inline">
+      {% csrf_token %}
+      <button type="submit">Enviar email de teste</button>
+    </form>
+  </li>
+{% endblock %}

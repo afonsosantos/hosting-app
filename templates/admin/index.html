@@ -1,0 +1,9 @@
+{% extends "admin/index.html" %}
+{% load dashboard %}
+
+{% block content %}
+<div id="content-main" class="app-list">
+  {% billing_dashboard %}
+  {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+</div>
+{% endblock %}

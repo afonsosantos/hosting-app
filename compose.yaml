@@ -1,0 +1,52 @@
+name: hosting-app
+
+x-app: &app
+  image: hosting-app:latest
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+  volumes:
+    - media:/app/media
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    <<: *app
+    build: .
+    ports:
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Gera cobranças, envia notificações e sincroniza o Proxmox periodicamente.
+  scheduler:
+    <<: *app
+    command: ["python", "manage.py", "run_scheduler"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      RUN_MIGRATIONS: "0"
+    healthcheck:
+      disable: true
+    depends_on:
+      web:
+        condition: service_healthy  # garante que as migrações já correram
+
+volumes:
+  pgdata:
+  media:

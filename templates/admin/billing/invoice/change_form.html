@@ -1,0 +1,23 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+  {% if original.pk %}
+    <li><a href="{% url 'admin:billing_invoice_view' original.pk %}" target="_blank">Ver documento</a></li>
+    <li><a href="{% url 'admin:billing_invoice_pdf' original.pk %}">PDF</a></li>
+    <li>
+      <form method="post" action="{% url 'admin:billing_invoice_send' original.pk %}" style="display:inline">
+        {% csrf_token %}
+        <button type="submit">Enviar por email</button>
+      </form>
+    </li>
+    {% if original.status == "pending" %}
+    <li>
+      <form method="post" action="{% url 'admin:billing_invoice_pay' original.pk %}">
+        {% csrf_token %}
+        <button type="submit">Marcar como pago (hoje)</button>
+      </form>
+    </li>
+    {% endif %}
+  {% endif %}
+  {{ block.super }}
+{% endblock %}
