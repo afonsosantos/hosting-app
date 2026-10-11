@@ -47,6 +47,18 @@ O serviço `scheduler` corre a cada `SCHEDULER_INTERVAL` segundos (1h por omiss�
 
 Ambos são idempotentes e podem ser corridos à mão: `docker compose exec web python manage.py run_billing`.
 
+## Instalação rápida (LXC Docker do Proxmox)
+
+1. Na shell do nó Proxmox, criar o LXC com o script
+   [Docker do community-scripts](https://community-scripts.org/scripts/docker) (as opções por omissão servem).
+2. Dentro do LXC (`pct enter <CTID>`):
+   ```sh
+   curl -fsSL https://raw.githubusercontent.com/afonsosantos/hosting-app/main/scripts/install.sh | bash
+   ```
+   Instala em `/opt/hosting-app`, cria o `.env` com segredos aleatórios e acesso por
+   `http://<ip-do-lxc>:8000`. A password do admin fica no `.env` (`DJANGO_SUPERUSER_PASSWORD`).
+3. Para atualizar, correr o mesmo comando (faz `git pull` e reconstrói; o `.env` não é alterado).
+
 ## Produção (Docker num LXC do Proxmox)
 
 1. Criar o LXC (Debian 13) com **nesting** e **keyctl** ativos
